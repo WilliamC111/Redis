@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscar y Gestionar Actores</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">REDIS ACTORES</h1>
+
+        <div class="row">
+            <div class="col-md-6 offset-md-3">
+                <form id="searchForm">
+                    <div class="mb-3">
+                        <label for="actorName" class="form-label">Nombre del Actor</label>
+                        <input type="text" class="form-control" id="actorName" placeholder="Ingrese el nombre del actor" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Buscar Actor</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="row mt-5">
+            <div class="col-md-10 offset-md-1">
+                <h3>Resultados de Búsqueda</h3>
+                <table class="table table-striped" id="resultTable">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Año de Nacimiento</th>
+                            <th>Año de Muerte</th>
+                            <th>Profesión</th>
+                            <th>Título Conocido</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="row mt-5">
+            <div class="col-md-10 offset-md-1">
+                <h3>Caché de Actores</h3>
+                <table class="table table-striped" id="cacheTable">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Datos</th>
+                            <th>Conteo de Accesos</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cacheBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('searchForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const actorName = document.getElementById('actorName').value.trim();
+            if (actorName) {
+                searchActor(actorName);
+            }
+        });
+
+        async function searchActor(name) {
+            try {
+                const response = await fetch(`/actors/${name}`);
+                if (response.ok) {
+                    const actorData = await response.json();
+                    displayResult([actorData]);
+                    loadCache();  
+                } else if (response.status === 404) {
+                    alert('Actor no encontrado.');
+                    clearTable();
+                } else {
+                    throw new Error('Error en la búsqueda');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Hubo un error al buscar el actor.');
+            }
+        }
+
+        function displayResult(data) {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';  
+
+            data.forEach(actor => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${actor.primaryName}</td>
+                    <td>${actor.birthYear || 'N/A'}</td>
+                    <td>${actor.deathYear || 'N/A'}</td>
+                    <td>${actor.primaryProfession || 'N/A'}</td>
+                    <td>${actor.knownForTitle || 'N/A'}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="deleteActor('${actor.primaryName}')">Eliminar</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        async function deleteActor(name) {
+            if (!confirm(`¿Seguro que quieres eliminar al actor "${name}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/actors/${name}`, { method: 'DELETE' });
+                if (response.ok) {
+                    alert(`Actor "${name}" eliminado con éxito.`);
+                    clearTable();
+                    loadCache();  
+                } else {
+                    throw new Error('Error al eliminar el actor');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Hubo un error al eliminar el actor.');
+            }
+        }
+
+        // Función para limpiar la tabla de búsqueda
+        function clearTable() {
+            document.getElementById('tableBody').innerHTML = '';
+        }
+
+        // Función para cargar la caché desde el servidor
+        async function loadCache() {
+            try {
+                const response = await fetch('/cache');
+                const cacheData = await response.json();
+
+                const cacheBody = document.getElementById('cacheBody');
+                cacheBody.innerHTML = '';
+
+                cacheData.forEach(entry => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${entry.key}</td>
+                        <td>${JSON.stringify(entry.data)}</td>
+                        <td>${entry.count}</td>
+                    `;
+                    cacheBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error(error);
+                alert('Hubo un error al cargar la caché.');
+            }
+        }
+        loadCache();
+    </script>
+</body>
+</html>
